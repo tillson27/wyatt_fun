@@ -18,7 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Pencil, Save, Trash2 } from "lucide-react";
 
 interface Rollout {
   id: string;
@@ -76,6 +84,11 @@ export default function SiteDetailPage() {
   const [editingRollouts, setEditingRollouts] = useState(false);
   const [rolloutEdits, setRolloutEdits] = useState<Rollout[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editingSite, setEditingSite] = useState(false);
+  const [siteForm, setSiteForm] = useState({ name: "", description: "", location: "" });
+  const [savingSite, setSavingSite] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetch(`/api/sites/${params.id}`)
@@ -83,6 +96,11 @@ export default function SiteDetailPage() {
       .then((data) => {
         setSite(data);
         setRolloutEdits(data.rollouts);
+        setSiteForm({
+          name: data.name || "",
+          description: data.description || "",
+          location: data.location || "",
+        });
       });
   }, [params.id]);
 
@@ -108,6 +126,35 @@ export default function SiteDetailPage() {
     );
   };
 
+  const saveSiteDetails = async () => {
+    if (!siteForm.name.trim()) return;
+    setSavingSite(true);
+    const res = await fetch(`/api/sites/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: siteForm.name,
+        description: siteForm.description,
+        location: siteForm.location,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setSite(updated);
+      setEditingSite(false);
+    }
+    setSavingSite(false);
+  };
+
+  const deleteSite = async () => {
+    setDeleting(true);
+    const res = await fetch(`/api/sites/${params.id}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/sites");
+    }
+    setDeleting(false);
+  };
+
   if (!site) return <p className="text-slate-400 py-8">Loading...</p>;
 
   return (
@@ -116,14 +163,88 @@ export default function SiteDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">{site.name}</h1>
-          <p className="text-sm text-slate-500">
-            {site.description}
-            {site.location && ` - ${site.location}`}
-          </p>
+        <div className="flex-1">
+          {editingSite ? (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={siteForm.name}
+                  onChange={(e) => setSiteForm({ ...siteForm, name: e.target.value })}
+                  placeholder="Site name"
+                  className="text-lg font-bold"
+                />
+              </div>
+              <Input
+                value={siteForm.description}
+                onChange={(e) => setSiteForm({ ...siteForm, description: e.target.value })}
+                placeholder="Description"
+              />
+              <Input
+                value={siteForm.location}
+                onChange={(e) => setSiteForm({ ...siteForm, location: e.target.value })}
+                placeholder="Location"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={saveSiteDetails} disabled={!siteForm.name.trim() || savingSite}>
+                  <Save className="h-3 w-3 mr-1" />
+                  {savingSite ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingSite(false);
+                    setSiteForm({
+                      name: site.name || "",
+                      description: site.description || "",
+                      location: site.location || "",
+                    });
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold">{site.name}</h1>
+              <p className="text-sm text-slate-500">
+                {site.description}
+                {site.location && ` - ${site.location}`}
+              </p>
+            </>
+          )}
         </div>
+        {!editingSite && (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setEditingSite(true)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Site</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{site.name}</strong>? This will remove all rollout data and progress snapshots for this site. Tasks and milestones will be unlinked but not deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteSite} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete Site"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="overview">
         <TabsList>

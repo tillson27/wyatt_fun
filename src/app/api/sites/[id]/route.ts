@@ -29,6 +29,22 @@ export async function PUT(
 ) {
   const body = await req.json();
 
+  // Update site fields if provided
+  const siteUpdate: Record<string, string | null> = {};
+  if (body.name !== undefined) siteUpdate.name = body.name?.trim() || null;
+  if (body.description !== undefined) siteUpdate.description = body.description?.trim() || null;
+  if (body.location !== undefined) siteUpdate.location = body.location?.trim() || null;
+
+  if (Object.keys(siteUpdate).length > 0) {
+    if (siteUpdate.name === null || siteUpdate.name === "") {
+      return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
+    }
+    await prisma.site.update({
+      where: { id: params.id },
+      data: siteUpdate,
+    });
+  }
+
   // Update rollouts if provided
   if (body.rollouts) {
     for (const r of body.rollouts) {
@@ -54,4 +70,20 @@ export async function PUT(
     },
   });
   return NextResponse.json(site);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  // Delete related records first, then the site
+  await prisma.$transaction([
+    prisma.progressSnapshot.deleteMany({ where: { siteId: params.id } }),
+    prisma.siteVendorRollout.deleteMany({ where: { siteId: params.id } }),
+    prisma.task.updateMany({ where: { siteId: params.id }, data: { siteId: null } }),
+    prisma.milestone.updateMany({ where: { siteId: params.id }, data: { siteId: null } }),
+    prisma.site.delete({ where: { id: params.id } }),
+  ]);
+
+  return NextResponse.json({ success: true });
 }
