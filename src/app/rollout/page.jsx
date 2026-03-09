@@ -68,6 +68,17 @@ function activityPct(item) {
   return Math.round(total / acts.length);
 }
 
+const RAG_PRIORITY = { Green: 1, Amber: 2, Red: 3 };
+
+function activityRag(item) {
+  const acts = item?.activities;
+  if (!acts || acts.length === 0) return item?.rag ?? "Green";
+  return acts.reduce((worst, a) => {
+    const r = a.rag ?? "Green";
+    return RAG_PRIORITY[r] > RAG_PRIORITY[worst] ? r : worst;
+  }, "Green");
+}
+
 function newActivityId() {
   return `act-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
@@ -203,6 +214,7 @@ function InlineCell({ itemKey, item, onUpdate, onEdit, compact = false }) {
   const today = new Date();
   const overdue = item.targetGoLive && new Date(item.targetGoLive) < today && item.status !== "Complete";
   const hasActs = item.activities?.length > 0;
+  const computedRag = activityRag(item);
 
   useEffect(() => {
     if (!open) return;
@@ -222,7 +234,7 @@ function InlineCell({ itemKey, item, onUpdate, onEdit, compact = false }) {
         onClick={() => setOpen(o => !o)}
         className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs transition-all hover:shadow-sm ${STATUS_CLS[item.status]} ${overdue ? "ring-1 ring-red-400" : ""} ${open ? "shadow-sm" : ""}`}
       >
-        <RagDot rag={item.rag} size="w-1.5 h-1.5" />
+        <RagDot rag={computedRag} size="w-1.5 h-1.5" />
         {compact ? (item.status === "Not Started" ? "—" : item.status) : item.status}
         {hasActs && <Activity className="h-2.5 w-2.5 ml-0.5 opacity-50" />}
       </button>
@@ -240,15 +252,23 @@ function InlineCell({ itemKey, item, onUpdate, onEdit, compact = false }) {
             ))}
           </div>
           <p className="text-xs font-medium text-slate-500 mb-1.5">RAG</p>
-          <div className="flex gap-1.5">
-            {["Green", "Amber", "Red"].map(r => (
-              <button key={r}
-                onClick={() => save({ rag: r })}
-                className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-1 rounded border text-xs transition-all ${item.rag === r ? `${RAG[r].light} ${RAG[r].border} font-medium` : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}>
-                <RagDot rag={r} size="w-2 h-2" />{r}
-              </button>
-            ))}
-          </div>
+          {hasActs ? (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded border ${RAG[computedRag].light} ${RAG[computedRag].border}`}>
+              <RagDot rag={computedRag} size="w-2 h-2" />
+              <span className={`text-xs font-medium ${RAG[computedRag].text}`}>{computedRag}</span>
+              <span className="text-xs text-slate-400">from activities</span>
+            </div>
+          ) : (
+            <div className="flex gap-1.5">
+              {["Green", "Amber", "Red"].map(r => (
+                <button key={r}
+                  onClick={() => save({ rag: r })}
+                  className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-1 rounded border text-xs transition-all ${item.rag === r ? `${RAG[r].light} ${RAG[r].border} font-medium` : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                  <RagDot rag={r} size="w-2 h-2" />{r}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => { setOpen(false); onEdit(itemKey); }}
             className="mt-2.5 w-full text-xs text-slate-400 hover:text-slate-600 text-center pt-2 border-t border-slate-100">
@@ -283,7 +303,7 @@ function EditModal({ itemKey, items, onSave, onClose }) {
   const addActivity = () =>
     setForm(prev => ({
       ...prev,
-      activities: [...prev.activities, { id: newActivityId(), title: "", pctComplete: 0, completed: false, dueDate: "" }],
+      activities: [...prev.activities, { id: newActivityId(), title: "", pctComplete: 0, completed: false, dueDate: "", rag: "Green" }],
     }));
 
   const setAct = (i, field, value) =>
@@ -341,16 +361,32 @@ function EditModal({ itemKey, items, onSave, onClose }) {
           {/* RAG */}
           <div>
             <p className="text-xs font-medium text-slate-600 mb-2">RAG Status</p>
-            <div className="flex gap-2">
-              {["Green","Amber","Red"].map(r => (
-                <button key={r} onClick={() => set("rag", r)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md border text-sm transition-all ${
-                    form.rag === r ? `${RAG[r].light} ${RAG[r].border} font-medium ring-2 ring-offset-1 ${RAG[r].ring}` : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
-                  }`}>
-                  <RagDot rag={r} size="w-3 h-3" /> {r}
-                </button>
-              ))}
-            </div>
+            {hasActivities ? (
+              (() => {
+                const computed = form.activities.reduce((worst, a) => {
+                  const r = a.rag ?? "Green";
+                  return RAG_PRIORITY[r] > RAG_PRIORITY[worst] ? r : worst;
+                }, "Green");
+                return (
+                  <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-md border ${RAG[computed].light} ${RAG[computed].border}`}>
+                    <RagDot rag={computed} size="w-3 h-3" />
+                    <span className={`text-sm font-semibold ${RAG[computed].text}`}>{computed}</span>
+                    <span className="text-xs text-slate-400 ml-1">— derived from most critical activity</span>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="flex gap-2">
+                {["Green","Amber","Red"].map(r => (
+                  <button key={r} onClick={() => set("rag", r)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md border text-sm transition-all ${
+                      form.rag === r ? `${RAG[r].light} ${RAG[r].border} font-medium ring-2 ring-offset-1 ${RAG[r].ring}` : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                    }`}>
+                    <RagDot rag={r} size="w-3 h-3" /> {r}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* % Complete — slider when no activities, rollup badge when activities exist */}
@@ -477,13 +513,25 @@ function EditModal({ itemKey, items, onSave, onClose }) {
                       <span className="text-xs text-slate-400">%</span>
                     </div>
 
-                    {/* Deadline row */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">Deadline</span>
-                      <input type="date" value={act.dueDate}
-                        onChange={e => setAct(i, "dueDate", e.target.value)}
-                        className={`border rounded px-2 py-0.5 text-xs ${overdue ? "border-red-300 text-red-600" : "border-slate-200 text-slate-700"}`} />
-                      {overdue && <span className="text-xs text-red-500">Overdue</span>}
+                    {/* RAG + Deadline row */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        {["Green","Amber","Red"].map(r => (
+                          <button key={r} onClick={() => setAct(i, "rag", r)}
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs transition-all ${
+                              (act.rag ?? "Green") === r ? `${RAG[r].light} ${RAG[r].border} font-medium` : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                            }`}>
+                            <RagDot rag={r} size="w-1.5 h-1.5" />{r}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 ml-auto">
+                        <span className="text-xs text-slate-400">Deadline</span>
+                        <input type="date" value={act.dueDate}
+                          onChange={e => setAct(i, "dueDate", e.target.value)}
+                          className={`border rounded px-2 py-0.5 text-xs ${overdue ? "border-red-300 text-red-600" : "border-slate-200 text-slate-700"}`} />
+                        {overdue && <span className="text-xs text-red-500">Overdue</span>}
+                      </div>
                     </div>
                   </div>
                 );
@@ -511,7 +559,7 @@ function SummaryView({ items }) {
   const total   = all.length;
   const avgPct  = Math.round(all.reduce((s, i) => s + activityPct(i), 0) / total);
   const live    = all.filter(i => ["Go-Live","Complete"].includes(i.status)).length;
-  const reds    = all.filter(i => i.rag === "Red").length;
+  const reds    = all.filter(i => activityRag(i) === "Red").length;
   const overdue = all.filter(i => i.targetGoLive && new Date(i.targetGoLive) < today && i.status !== "Complete").length;
 
   const buStats = BUSINESS_UNITS.map(bu => {
@@ -699,7 +747,7 @@ function ModuleView({ items, onUpdate, onEdit }) {
           </div>
           <div className="flex gap-4 text-sm text-slate-500">
             <span>{rows.filter(r => r.item.status === "Complete").length} complete</span>
-            <span className="text-red-600">{rows.filter(r => r.item.rag === "Red").length} red</span>
+            <span className="text-red-600">{rows.filter(r => activityRag(r.item) === "Red").length} red</span>
           </div>
         </div>
         <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Overall Progress</span><span>{avg}%</span></div>
@@ -815,8 +863,8 @@ function SiteView({ items, onUpdate, onEdit }) {
           </div>
           <div className="flex gap-4 text-sm text-slate-500">
             <span>{rows.filter(r => r.item.status === "Complete").length}/{rows.length} complete</span>
-            {rows.filter(r => r.item.rag === "Red").length > 0 && (
-              <span className="text-red-600">{rows.filter(r => r.item.rag === "Red").length} red</span>
+            {rows.filter(r => activityRag(r.item) === "Red").length > 0 && (
+              <span className="text-red-600">{rows.filter(r => activityRag(r.item) === "Red").length} red</span>
             )}
           </div>
         </div>
@@ -964,7 +1012,8 @@ function TimelineView({ items, onEdit }) {
                   const trackW = Math.max(1, targetPct - startPct);
                   const fillW = trackW * pct / 100;
                   const overdue = new Date(item.targetGoLive) < today && item.status !== "Complete";
-                  const barColor = overdue ? "bg-red-500" : item.rag === "Red" ? "bg-red-500" : item.rag === "Amber" ? "bg-amber-500" : "bg-teal-500";
+                  const rag = activityRag(item);
+                  const barColor = overdue ? "bg-red-500" : rag === "Red" ? "bg-red-500" : rag === "Amber" ? "bg-amber-500" : "bg-teal-500";
 
                   return (
                     <div key={key} className="flex items-center h-6">
