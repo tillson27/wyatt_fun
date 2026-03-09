@@ -125,6 +125,23 @@ model Meeting {
   actionItems Task[]
 }
 
+model RolloutItem {
+  id            String   @id // format: "site::mod"
+  site          String
+  mod           String
+  status        String   @default("Not Started")
+  rag           String   @default("Green")
+  owner         String   @default("")
+  targetGoLive  String   @default("")
+  actualGoLive  String   @default("")
+  notes         String   @default("")
+  blockers      String   @default("")
+  pctComplete   Int      @default(0)
+  manualPct     Boolean  @default(false)
+  activities    Json     @default("[]")
+  updatedAt     DateTime @updatedAt
+}
+
 model ProgressSnapshot {
   id             String   @id @default(cuid())
   date           DateTime

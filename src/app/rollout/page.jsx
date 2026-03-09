@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart,
   ChevronDown, ChevronRight, X, CheckCircle2, AlertTriangle,
@@ -1098,12 +1098,53 @@ const NAV = [
 ];
 
 export default function RolloutDashboard() {
-  const [items, setItems]   = useState(createSeedData);
+  const [items, setItems]   = useState(null);
   const [view, setView]     = useState("summary");
   const [editing, setEditing] = useState(null);
+  const [seeding, setSeeding] = useState(false);
 
-  const updateItem = (key, updates) =>
-    setItems(prev => ({ ...prev, [key]: { ...prev[key], ...updates } }));
+  useEffect(() => {
+    fetch("/api/rollout")
+      .then(r => r.json())
+      .then(data => {
+        if (Object.keys(data).length === 0) {
+          // DB is empty — seed it from the hardcoded data
+          setSeeding(true);
+          const seed = createSeedData();
+          fetch("/api/rollout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(seed),
+          }).then(() => {
+            setItems(seed);
+            setSeeding(false);
+          });
+        } else {
+          setItems(data);
+        }
+      });
+  }, []);
+
+  const updateItem = (key, updates) => {
+    const next = { ...items[key], ...updates };
+    setItems(prev => ({ ...prev, [key]: next }));
+    fetch(`/api/rollout/${encodeURIComponent(key)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(next),
+    });
+  };
+
+  if (!items) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-400">{seeding ? "Initializing data…" : "Loading…"}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
