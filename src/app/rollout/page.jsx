@@ -13,9 +13,9 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 // ============================================================
 
 const BUSINESS_UNITS = [
-  { id: "cold-lake",   name: "Cold Lake Thermal",        province: "Alberta",             sites: ["Lindbergh", "Orion", "Tucker", "Selina"] },
-  { id: "lloyd-th",   name: "Lloydminster Thermal",      province: "Saskatchewan",         sites: ["Meota", "Edam", "Vawn", "Glenbogie", "Plover Lake", "Taiga"] },
-  { id: "lloyd-conv", name: "Lloydminster Conventional", province: "Alberta/Saskatchewan", sites: ["Bodo-Cosine", "Bellis", "Winter", "Cactus Lake", "Court", "Druid"] },
+  { id: "cold-lake",   name: "Cold Lake Thermal",        province: "Alberta",             sites: ["Lindbergh", "Orion", "Tucker"] },
+  { id: "lloyd-th",   name: "Lloydminster Thermal",      province: "Saskatchewan",        sites: ["Vawn", "Meota-East", "Meota-West", "Meota-West 2", "Edam", "Plover Lake", "Taiga", "Hamlin (Rail Terminal)", "Glenbogie"] },
+  { id: "lloyd-conv", name: "Lloydminster Conventional", province: "Alberta/Saskatchewan", sites: ["Cactus Lake", "Court", "Bodo", "Cosine", "Druid", "Winter", "Bellis", "Plover Lake Conventional", "McLaren"] },
 ];
 
 const MODULES = [
@@ -28,7 +28,7 @@ const MODULES = [
   { id: "op-rounds",  name: "Operator Rounds",          short: "Op. Rounds" },
 ];
 
-const LLOYD_THERMAL = new Set(["Meota", "Edam", "Vawn", "Glenbogie", "Plover Lake", "Taiga"]);
+const LLOYD_THERMAL = new Set(["Vawn", "Meota-East", "Meota-West", "Meota-West 2", "Edam", "Plover Lake", "Taiga", "Hamlin (Rail Terminal)", "Glenbogie"]);
 
 function inScope(site, mod) {
   if (mod === "isolera")   return site === "Lindbergh";
@@ -78,7 +78,7 @@ function newActivityId() {
 
 function createSeedData() {
   const d = {};
-  const a = (site, mod, status, rag, owner = "", tgl = "", agl = "", notes = "", blockers = "") => {
+  const a = (site, mod, status = "Not Started", rag = "Green", owner = "", tgl = "", agl = "", notes = "", blockers = "") => {
     d[`${site}::${mod}`] = {
       site, mod, status, rag, owner,
       targetGoLive: tgl, actualGoLive: agl,
@@ -89,177 +89,22 @@ function createSeedData() {
     };
   };
 
-  // Cold Lake — Lindbergh (all 7)
-  a("Lindbergh","shift-logs","Complete",      "Green","M. Patterson","2025-11-30","2025-11-28","Smooth go-live, high adoption rate.");
-  a("Lindbergh","facilities","Complete",      "Green","M. Patterson","2025-12-15","2025-12-10","All checklists digitized and validated.");
-  a("Lindbergh","carseals",  "Go-Live",       "Green","S. Nguyen",   "2026-01-31","",          "Live since Jan 20, monitoring ongoing.");
-  a("Lindbergh","csb",       "UAT",           "Amber","S. Nguyen",   "2026-02-28","","",        "2 test cases failing; awaiting SafeTrack dev fix.");
-  a("Lindbergh","loto",      "Configuration", "Green","T. Olson",    "2026-03-31");
-  a("Lindbergh","isolera",   "Configuration", "Red",  "T. Olson",    "2026-03-15","","",        "Data migration blocked — IT ticket #4412 open since Dec. Needs exec escalation.");
-  a("Lindbergh","op-rounds", "Training",      "Green","K. Sharma",   "2026-02-15","","Field crew training 80% complete.");
+  // ── Cold Lake Thermal ──────────────────────────────────────
+  const CLT = ["shift-logs","facilities","carseals","csb","loto"];
+  ["Lindbergh","Orion","Tucker"].forEach(s => CLT.forEach(m => a(s, m)));
+  // Lindbergh extras
+  a("Lindbergh","isolera");
+  ["Lindbergh","Orion","Tucker"].forEach(s => a(s, "op-rounds"));
 
-  // Orion (6)
-  a("Orion","shift-logs","Go-Live",       "Green","B. Chen",   "2026-01-15","","Launched Jan 10, minor issues resolved.");
-  a("Orion","facilities","UAT",           "Amber","B. Chen",   "2026-02-28","","","Site manager sign-off delayed 2 weeks.");
-  a("Orion","carseals",  "Configuration", "Green","L. Forbes", "2026-03-15");
-  a("Orion","csb",       "Configuration", "Green","L. Forbes", "2026-03-31");
-  a("Orion","loto",      "Discovery",     "Green","T. Olson",  "2026-04-30");
-  a("Orion","op-rounds", "Configuration", "Green","K. Sharma", "2026-03-31");
+  // ── Lloydminster Thermal ───────────────────────────────────
+  const LTH_SITES = ["Vawn","Meota-East","Meota-West","Meota-West 2","Edam","Plover Lake","Taiga","Hamlin (Rail Terminal)","Glenbogie"];
+  const LTH_MODS  = ["shift-logs","facilities","carseals","csb","loto"];
+  LTH_SITES.forEach(s => LTH_MODS.forEach(m => a(s, m)));
 
-  // Tucker (6)
-  a("Tucker","shift-logs","Configuration","Green","R. Dahl",  "2026-03-15");
-  a("Tucker","facilities","Configuration","Amber","R. Dahl",  "2026-03-31","","","Awaiting updated facility layout drawings.");
-  a("Tucker","carseals",  "Discovery",    "Green","P. Watts", "2026-04-30");
-  a("Tucker","csb",       "Discovery",    "Green","P. Watts", "2026-05-15");
-  a("Tucker","loto",      "Not Started",  "Green","",         "2026-06-30");
-  a("Tucker","op-rounds", "Discovery",    "Green","K. Sharma","2026-05-31");
-
-  // Selina (6)
-  a("Selina","shift-logs","Discovery",  "Green","A. Flores","2026-04-15");
-  a("Selina","facilities","Discovery",  "Amber","A. Flores","2026-05-31","","","Site access restricted during maintenance window.");
-  a("Selina","carseals",  "Not Started","Green","",          "2026-06-15");
-  a("Selina","csb",       "Not Started","Green","",          "2026-06-30");
-  a("Selina","loto",      "Not Started","Green","",          "2026-07-31");
-  a("Selina","op-rounds", "Not Started","Green","",          "2026-07-15");
-
-  // Lloyd Thermal — 5 each
-  a("Meota","shift-logs","Training",     "Green","D. McIntosh","2026-02-28","","Training sessions underway, 70% attendance.");
-  a("Meota","facilities","UAT",          "Green","D. McIntosh","2026-03-15");
-  a("Meota","carseals",  "Configuration","Amber","J. Reyes",   "2026-03-31","","","Equipment master list 60% complete.");
-  a("Meota","csb",       "Configuration","Green","J. Reyes",   "2026-04-15");
-  a("Meota","loto",      "Discovery",    "Green","C. Walsh",   "2026-05-31");
-
-  a("Edam","shift-logs","Configuration","Green","V. Petrov","2026-03-31");
-  a("Edam","facilities","Configuration","Green","V. Petrov","2026-04-15");
-  a("Edam","carseals",  "Discovery",    "Red",  "N. Hunt",  "2026-04-30","","","Lead stakeholder on leave until April; discovery stalled.");
-  a("Edam","csb",       "Discovery",    "Green","N. Hunt",  "2026-05-15");
-  a("Edam","loto",      "Not Started",  "Green","",         "2026-06-30");
-
-  a("Vawn","shift-logs","Discovery",  "Green","H. Larsen","2026-04-30");
-  a("Vawn","facilities","Discovery",  "Amber","H. Larsen","2026-05-31","","","Scope clarification needed with operations team.");
-  a("Vawn","carseals",  "Not Started","Green","",          "2026-06-15");
-  a("Vawn","csb",       "Not Started","Green","",          "2026-06-30");
-  a("Vawn","loto",      "Not Started","Green","",          "2026-07-31");
-
-  a("Glenbogie","shift-logs","Discovery",  "Green","E. Park","2026-05-15");
-  a("Glenbogie","facilities","Not Started","Green","",       "2026-06-30");
-  a("Glenbogie","carseals",  "Not Started","Green","",       "2026-07-15");
-  a("Glenbogie","csb",       "Not Started","Green","",       "2026-07-31");
-  a("Glenbogie","loto",      "Not Started","Green","",       "2026-08-31");
-
-  a("Plover Lake","shift-logs","Not Started","Green","","2026-06-30");
-  a("Plover Lake","facilities","Not Started","Green","","2026-07-15");
-  a("Plover Lake","carseals",  "Not Started","Green","","2026-08-15");
-  a("Plover Lake","csb",       "Not Started","Green","","2026-08-31");
-  a("Plover Lake","loto",      "Not Started","Green","","2026-09-30");
-
-  a("Taiga","shift-logs","Not Started","Green","","2026-07-15");
-  a("Taiga","facilities","Not Started","Green","","2026-07-31");
-  a("Taiga","carseals",  "Not Started","Green","","2026-08-31");
-  a("Taiga","csb",       "Not Started","Green","","2026-09-15");
-  a("Taiga","loto",      "Not Started","Green","","2026-10-31");
-
-  // Lloyd Conventional — 6 each
-  a("Bodo-Cosine","shift-logs","UAT",           "Green","F. Bergman","2026-02-15");
-  a("Bodo-Cosine","facilities","Configuration", "Green","F. Bergman","2026-03-15");
-  a("Bodo-Cosine","carseals",  "Configuration", "Amber","G. Thomas", "2026-03-31","","","Legacy system integration pending.");
-  a("Bodo-Cosine","csb",       "Discovery",     "Green","G. Thomas", "2026-04-30");
-  a("Bodo-Cosine","loto",      "Discovery",     "Green","W. Bell",   "2026-05-31");
-  a("Bodo-Cosine","op-rounds", "Configuration", "Green","W. Bell",   "2026-04-15");
-
-  a("Bellis","shift-logs","Configuration","Green","I. Young","2026-03-31");
-  a("Bellis","facilities","Discovery",    "Green","I. Young","2026-04-30");
-  a("Bellis","carseals",  "Discovery",    "Red",  "O. Cruz", "2026-04-30","","","Conflicting project priorities; team bandwidth critically low.");
-  a("Bellis","csb",       "Not Started",  "Green","",         "2026-06-15");
-  a("Bellis","loto",      "Not Started",  "Green","",         "2026-07-15");
-  a("Bellis","op-rounds", "Discovery",    "Green","O. Cruz",  "2026-05-31");
-
-  a("Winter","shift-logs","Discovery",  "Amber","P. Morrison","2026-04-30","","","Kickoff rescheduled from Jan; 3-week delay.");
-  a("Winter","facilities","Discovery",  "Green","P. Morrison","2026-05-15");
-  a("Winter","carseals",  "Not Started","Green","",           "2026-06-30");
-  a("Winter","csb",       "Not Started","Green","",           "2026-07-15");
-  a("Winter","loto",      "Not Started","Green","",           "2026-08-15");
-  a("Winter","op-rounds", "Not Started","Green","",           "2026-07-31");
-
-  a("Cactus Lake","shift-logs","Not Started","Green","","2026-05-31");
-  a("Cactus Lake","facilities","Not Started","Green","","2026-06-15");
-  a("Cactus Lake","carseals",  "Not Started","Green","","2026-07-15");
-  a("Cactus Lake","csb",       "Not Started","Green","","2026-07-31");
-  a("Cactus Lake","loto",      "Not Started","Green","","2026-08-31");
-  a("Cactus Lake","op-rounds", "Not Started","Green","","2026-08-15");
-
-  a("Court","shift-logs","Not Started","Green","","2026-06-30");
-  a("Court","facilities","Not Started","Green","","2026-07-15");
-  a("Court","carseals",  "Not Started","Green","","2026-08-15");
-  a("Court","csb",       "Not Started","Green","","2026-08-31");
-  a("Court","loto",      "Not Started","Green","","2026-09-30");
-  a("Court","op-rounds", "Not Started","Green","","2026-09-15");
-
-  a("Druid","shift-logs","Not Started","Green","","2026-07-31");
-  a("Druid","facilities","Not Started","Green","","2026-08-15");
-  a("Druid","carseals",  "Not Started","Green","","2026-09-15");
-  a("Druid","csb",       "Not Started","Green","","2026-09-30");
-  a("Druid","loto",      "Not Started","Green","","2026-10-31");
-  a("Druid","op-rounds", "Not Started","Green","","2026-10-15");
-
-  // ---- Seed activities for several in-progress items ----
-
-  d["Lindbergh::csb"].activities = [
-    { id: "a1", title: "Prepare UAT test scenarios",   pctComplete: 100, completed: true,  dueDate: "2026-02-01" },
-    { id: "a2", title: "Execute UAT round 1",          pctComplete: 70,  completed: false, dueDate: "2026-02-14" },
-    { id: "a3", title: "Resolve UAT defects",          pctComplete: 20,  completed: false, dueDate: "2026-02-21" },
-    { id: "a4", title: "Obtain site manager sign-off", pctComplete: 0,   completed: false, dueDate: "2026-02-28" },
-  ];
-
-  d["Lindbergh::isolera"].activities = [
-    { id: "b1", title: "IT data migration scoping",   pctComplete: 30, completed: false, dueDate: "2026-01-31" },
-    { id: "b2", title: "Obtain IT approval (ticket #4412)", pctComplete: 0, completed: false, dueDate: "2026-02-15" },
-    { id: "b3", title: "Execute data migration",      pctComplete: 0,  completed: false, dueDate: "2026-03-01" },
-    { id: "b4", title: "Validate migrated data",      pctComplete: 0,  completed: false, dueDate: "2026-03-10" },
-  ];
-
-  d["Lindbergh::op-rounds"].activities = [
-    { id: "c1", title: "Field crew training — session 1", pctComplete: 100, completed: true,  dueDate: "2026-01-20" },
-    { id: "c2", title: "Field crew training — session 2", pctComplete: 100, completed: true,  dueDate: "2026-01-27" },
-    { id: "c3", title: "Field crew training — session 3", pctComplete: 80,  completed: false, dueDate: "2026-02-03" },
-    { id: "c4", title: "Supervisor sign-off",             pctComplete: 0,   completed: false, dueDate: "2026-02-15" },
-  ];
-
-  d["Meota::shift-logs"].activities = [
-    { id: "d1", title: "Supervisor group training",   pctComplete: 100, completed: true,  dueDate: "2026-02-07" },
-    { id: "d2", title: "Operators training — group A", pctComplete: 100, completed: true,  dueDate: "2026-02-14" },
-    { id: "d3", title: "Operators training — group B", pctComplete: 40,  completed: false, dueDate: "2026-02-21" },
-    { id: "d4", title: "Go-live readiness checklist", pctComplete: 0,   completed: false, dueDate: "2026-02-28" },
-  ];
-
-  d["Bodo-Cosine::shift-logs"].activities = [
-    { id: "e1", title: "UAT scenario design",  pctComplete: 100, completed: true,  dueDate: "2026-01-25" },
-    { id: "e2", title: "UAT execution",        pctComplete: 70,  completed: false, dueDate: "2026-02-08" },
-    { id: "e3", title: "Defect resolution",    pctComplete: 20,  completed: false, dueDate: "2026-02-12" },
-    { id: "e4", title: "Sign-off",             pctComplete: 0,   completed: false, dueDate: "2026-02-15" },
-  ];
-
-  d["Orion::shift-logs"].activities = [
-    { id: "f1", title: "Go-live preparation",  pctComplete: 100, completed: true, dueDate: "2026-01-08" },
-    { id: "f2", title: "Launch day support",   pctComplete: 100, completed: true, dueDate: "2026-01-10" },
-    { id: "f3", title: "Week 1 monitoring",    pctComplete: 100, completed: true, dueDate: "2026-01-17" },
-    { id: "f4", title: "Week 2 monitoring",    pctComplete: 60,  completed: false, dueDate: "2026-01-24" },
-  ];
-
-  d["Lindbergh::loto"].activities = [
-    { id: "g1", title: "Requirements gathering",       pctComplete: 100, completed: true,  dueDate: "2026-02-15" },
-    { id: "g2", title: "LOTO form design",             pctComplete: 60,  completed: false, dueDate: "2026-03-01" },
-    { id: "g3", title: "System configuration",         pctComplete: 10,  completed: false, dueDate: "2026-03-15" },
-    { id: "g4", title: "Integration testing",          pctComplete: 0,   completed: false, dueDate: "2026-03-25" },
-    { id: "g5", title: "H&S team review & sign-off",   pctComplete: 0,   completed: false, dueDate: "2026-03-31" },
-  ];
-
-  d["Orion::carseals"].activities = [
-    { id: "h1", title: "Equipment list import",   pctComplete: 60, completed: false, dueDate: "2026-02-28" },
-    { id: "h2", title: "Form configuration",      pctComplete: 30, completed: false, dueDate: "2026-03-08" },
-    { id: "h3", title: "Integration testing",     pctComplete: 0,  completed: false, dueDate: "2026-03-12" },
-    { id: "h4", title: "Config sign-off",         pctComplete: 0,  completed: false, dueDate: "2026-03-15" },
-  ];
+  // ── Lloydminster Conventional ──────────────────────────────
+  const LCV_SITES = ["Cactus Lake","Court","Bodo","Cosine","Druid","Winter","Bellis","Plover Lake Conventional","McLaren"];
+  const LCV_MODS  = ["shift-logs","facilities","carseals","csb","loto","op-rounds"];
+  LCV_SITES.forEach(s => LCV_MODS.forEach(m => a(s, m)));
 
   return d;
 }
@@ -1224,8 +1069,8 @@ export default function RolloutDashboard() {
           ))}
         </nav>
         <div className="p-4 border-t border-slate-700/60 space-y-0.5">
-          <p className="text-xs text-slate-500">3 Business Units · 16 Sites</p>
-          <p className="text-xs text-slate-500">7 Modules · 91 In-Scope Items</p>
+          <p className="text-xs text-slate-500">3 Business Units · 21 Sites</p>
+          <p className="text-xs text-slate-500">7 Modules · 118 In-Scope Items</p>
         </div>
       </aside>
 
