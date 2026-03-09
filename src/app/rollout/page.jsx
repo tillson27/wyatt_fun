@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart,
   ChevronDown, ChevronRight, X, CheckCircle2, AlertTriangle,
-  Clock, Target, Edit3, TrendingUp, Plus, Trash2, Activity,
+  Clock, Target, Edit3, TrendingUp, Plus, Trash2, Activity, Menu,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
@@ -576,7 +576,7 @@ function SummaryView({ items }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
           { label: "Total In-Scope Items", value: total,       icon: <Target className="h-5 w-5 text-slate-400" />,        cls: "bg-white border-slate-200" },
           { label: "Overall % Complete",   value: `${avgPct}%`,icon: <TrendingUp className="h-5 w-5 text-teal-500" />,     cls: "bg-teal-50 border-teal-200" },
@@ -591,7 +591,7 @@ function SummaryView({ items }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {buStats.map(bu => (
           <div key={bu.id} className="bg-white rounded-lg border border-slate-200 p-4">
             <p className="text-xs font-semibold text-slate-700 leading-tight">{bu.name}</p>
@@ -608,7 +608,7 @@ function SummaryView({ items }) {
           </div>
         ))}
 
-        <div className="col-span-2 bg-white rounded-lg border border-slate-200 p-4">
+        <div className="sm:col-span-3 md:col-span-2 bg-white rounded-lg border border-slate-200 p-4">
           <p className="text-xs font-semibold text-slate-700 mb-4">Completion by Module</p>
           <div className="space-y-3">
             {modStats.map(m => (
@@ -1054,6 +1054,7 @@ export default function RolloutDashboard() {
   const [view, setView]     = useState("summary");
   const [editing, setEditing] = useState(null);
   const [seeding, setSeeding] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/rollout")
@@ -1098,35 +1099,61 @@ export default function RolloutDashboard() {
     );
   }
 
+  const NavContent = () => (
+    <>
+      <div className="px-5 py-5 border-b border-slate-700/60">
+        <p className="text-xs font-bold text-white tracking-wide">STRATHCONA RESOURCES</p>
+        <p className="text-xs text-slate-400 mt-0.5">Digitization Rollout Tracker</p>
+      </div>
+      <nav className="flex-1 p-3 space-y-0.5">
+        {NAV.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => { setView(id); setNavOpen(false); }}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition-colors ${
+              view === id ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+            }`}>
+            <Icon className="h-4 w-4 flex-shrink-0" />{label}
+          </button>
+        ))}
+      </nav>
+      <div className="p-4 border-t border-slate-700/60 space-y-0.5">
+        <p className="text-xs text-slate-500">3 Business Units · 21 Sites</p>
+        <p className="text-xs text-slate-500">7 Modules · 118 In-Scope Items</p>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
-      <aside className="w-52 bg-slate-900 flex flex-col flex-shrink-0">
-        <div className="px-5 py-5 border-b border-slate-700/60">
-          <p className="text-xs font-bold text-white tracking-wide">STRATHCONA RESOURCES</p>
-          <p className="text-xs text-slate-400 mt-0.5">Digitization Rollout Tracker</p>
-        </div>
-        <nav className="flex-1 p-3 space-y-0.5">
-          {NAV.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setView(id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition-colors ${
-                view === id ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
-              }`}>
-              <Icon className="h-4 w-4 flex-shrink-0" />{label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-slate-700/60 space-y-0.5">
-          <p className="text-xs text-slate-500">3 Business Units · 21 Sites</p>
-          <p className="text-xs text-slate-500">7 Modules · 118 In-Scope Items</p>
-        </div>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-52 bg-slate-900 flex-col flex-shrink-0">
+        <NavContent />
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex-shrink-0">
-          <p className="font-semibold text-slate-800 text-sm">{NAV.find(n => n.id === view)?.label}</p>
-          <p className="text-xs text-slate-400">Operational Digitization Program · FY2026</p>
+      {/* Mobile drawer overlay */}
+      {navOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
+          <aside className="relative w-64 bg-slate-900 flex flex-col z-50">
+            <button onClick={() => setNavOpen(false)} className="absolute top-3 right-3 text-slate-400 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+            <NavContent />
+          </aside>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="bg-white border-b border-slate-200 px-4 py-3 flex-shrink-0 flex items-center gap-3">
+          <button onClick={() => setNavOpen(true)} className="md:hidden text-slate-500 hover:text-slate-800 flex-shrink-0">
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-800 text-sm truncate">{NAV.find(n => n.id === view)?.label}</p>
+            <p className="text-xs text-slate-400 hidden sm:block">Operational Digitization Program · FY2026</p>
+          </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-3 md:p-6">
           {view === "summary"  && <SummaryView  items={items} />}
           {view === "matrix"   && <MatrixView   items={items} onUpdate={updateItem} onEdit={setEditing} />}
           {view === "module"   && <ModuleView   items={items} onUpdate={updateItem} onEdit={setEditing} />}
