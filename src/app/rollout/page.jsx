@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart,
   ChevronDown, ChevronRight, X, CheckCircle2, AlertTriangle,
@@ -349,6 +349,73 @@ function ActivityList({ activities, onEdit }) {
 }
 
 // ============================================================
+// INLINE CELL — popover for quick status + RAG edits
+// ============================================================
+
+function InlineCell({ itemKey, item, onUpdate, onEdit, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const today = new Date();
+  const overdue = item.targetGoLive && new Date(item.targetGoLive) < today && item.status !== "Complete";
+  const hasActs = item.activities?.length > 0;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const save = (patch) => {
+    onUpdate(itemKey, { ...item, ...patch });
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative inline-block" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs transition-all hover:shadow-sm ${STATUS_CLS[item.status]} ${overdue ? "ring-1 ring-red-400" : ""} ${open ? "shadow-sm" : ""}`}
+      >
+        <RagDot rag={item.rag} size="w-1.5 h-1.5" />
+        {compact ? (item.status === "Not Started" ? "—" : item.status) : item.status}
+        {hasActs && <Activity className="h-2.5 w-2.5 ml-0.5 opacity-50" />}
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-xl border border-slate-200 p-3 w-56">
+          <p className="text-xs font-medium text-slate-500 mb-1.5">Status</p>
+          <div className="flex flex-wrap gap-1 mb-3">
+            {STATUS_OPTIONS.map(s => (
+              <button key={s}
+                onClick={() => save({ status: s, pctComplete: item.manualPct ? item.pctComplete : STATUS_PCT[s] })}
+                className={`px-2 py-0.5 rounded text-xs border transition-all ${STATUS_CLS[s]} ${item.status === s ? "ring-2 ring-offset-1 ring-blue-400 font-semibold" : "opacity-60 hover:opacity-100"}`}>
+                {s}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs font-medium text-slate-500 mb-1.5">RAG</p>
+          <div className="flex gap-1.5">
+            {["Green", "Amber", "Red"].map(r => (
+              <button key={r}
+                onClick={() => save({ rag: r })}
+                className={`flex items-center gap-1.5 flex-1 justify-center px-2 py-1 rounded border text-xs transition-all ${item.rag === r ? `${RAG[r].light} ${RAG[r].border} font-medium` : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                <RagDot rag={r} size="w-2 h-2" />{r}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => { setOpen(false); onEdit(itemKey); }}
+            className="mt-2.5 w-full text-xs text-slate-400 hover:text-slate-600 text-center pt-2 border-t border-slate-100">
+            Edit full details →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // EDIT MODAL — includes activity management
 // ============================================================
 
@@ -671,7 +738,7 @@ function SummaryView({ items }) {
 // MATRIX VIEW
 // ============================================================
 
-function MatrixView({ items, onEdit }) {
+function MatrixView({ items, onUpdate, onEdit }) {
   const [collapsed, setCollapsed] = useState({});
   const today = new Date();
 
@@ -722,12 +789,7 @@ function MatrixView({ items, onEdit }) {
                         const hasActs = item.activities?.length > 0;
                         return (
                           <td key={m.id} className="px-1 py-1.5 text-center">
-                            <button onClick={() => onEdit(`${site}::${m.id}`)}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs transition-all hover:shadow-sm ${STATUS_CLS[item.status]} ${overdue ? "ring-1 ring-red-400" : ""}`}>
-                              <RagDot rag={item.rag} size="w-1.5 h-1.5" />
-                              {item.status === "Not Started" ? "—" : item.status}
-                              {hasActs && <Activity className="h-2.5 w-2.5 ml-0.5 opacity-50" />}
-                            </button>
+                            <InlineCell itemKey={`${site}::${m.id}`} item={item} onUpdate={onUpdate} onEdit={onEdit} compact />
                           </td>
                         );
                       })}
@@ -760,7 +822,7 @@ function MatrixView({ items, onEdit }) {
 // MODULE VIEW
 // ============================================================
 
-function ModuleView({ items, onEdit }) {
+function ModuleView({ items, onUpdate, onEdit }) {
   const [selMod, setSelMod] = useState("shift-logs");
   const [expanded, setExpanded] = useState(new Set());
   const today = new Date();
@@ -832,9 +894,8 @@ function ModuleView({ items, onEdit }) {
                     </td>
                     <td className="px-4 py-2.5 font-medium text-slate-700">{site}</td>
                     <td className="px-4 py-2.5 text-slate-500 text-xs">{bu}</td>
-                    <td className="px-4 py-2.5"><StatusChip status={item.status} /></td>
                     <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5"><RagDot rag={item.rag} size="w-2.5 h-2.5" /><span className={`text-xs ${RAG[item.rag].text}`}>{item.rag}</span></div>
+                      <InlineCell itemKey={key} item={item} onUpdate={onUpdate} onEdit={onEdit} />
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 text-xs">{item.owner || "—"}</td>
                     <td className={`px-4 py-2.5 text-xs ${overdue ? "text-red-600 font-medium" : "text-slate-600"}`}>
@@ -853,7 +914,7 @@ function ModuleView({ items, onEdit }) {
                   </tr>
                   {isExpanded && (
                     <tr className="border-b border-slate-100 bg-slate-50/80">
-                      <td colSpan={9} className="px-4 pb-3 pt-1">
+                      <td colSpan={8} className="px-4 pb-3 pt-1">
                         <div className="ml-6 pl-4 border-l-2 border-slate-200">
                           <ActivityList activities={item.activities} onEdit={() => onEdit(key)} />
                         </div>
@@ -874,7 +935,7 @@ function ModuleView({ items, onEdit }) {
 // SITE VIEW
 // ============================================================
 
-function SiteView({ items, onEdit }) {
+function SiteView({ items, onUpdate, onEdit }) {
   const [selSite, setSelSite] = useState("Lindbergh");
   const [expanded, setExpanded] = useState(new Set());
   const today = new Date();
@@ -949,9 +1010,8 @@ function SiteView({ items, onEdit }) {
                       </button>
                     </td>
                     <td className="px-4 py-2.5 font-medium text-slate-700">{module.name}</td>
-                    <td className="px-4 py-2.5"><StatusChip status={item.status} /></td>
                     <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5"><RagDot rag={item.rag} size="w-2.5 h-2.5" /><span className={`text-xs ${RAG[item.rag].text}`}>{item.rag}</span></div>
+                      <InlineCell itemKey={key} item={item} onUpdate={onUpdate} onEdit={onEdit} />
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 text-xs">{item.owner || "—"}</td>
                     <td className={`px-4 py-2.5 text-xs ${overdue ? "text-red-600 font-medium" : "text-slate-600"}`}>
@@ -1176,9 +1236,9 @@ export default function RolloutDashboard() {
         </header>
         <main className="flex-1 overflow-auto p-6">
           {view === "summary"  && <SummaryView  items={items} />}
-          {view === "matrix"   && <MatrixView   items={items} onEdit={setEditing} />}
-          {view === "module"   && <ModuleView   items={items} onEdit={setEditing} />}
-          {view === "site"     && <SiteView     items={items} onEdit={setEditing} />}
+          {view === "matrix"   && <MatrixView   items={items} onUpdate={updateItem} onEdit={setEditing} />}
+          {view === "module"   && <ModuleView   items={items} onUpdate={updateItem} onEdit={setEditing} />}
+          {view === "site"     && <SiteView     items={items} onUpdate={updateItem} onEdit={setEditing} />}
           {view === "timeline" && <TimelineView items={items} onEdit={setEditing} />}
         </main>
       </div>
