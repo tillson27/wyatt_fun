@@ -7,12 +7,13 @@ const HASHED_PASSWORD = "a]3#fK9$mQ"; // obfuscated token stored in cookie when 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow login page, login API, and rollout dashboard
+  // Allow login page, login API, rollout dashboard and its API routes
   if (
     pathname === "/login" ||
     pathname === "/api/auth/login" ||
     pathname === "/rollout" ||
-    pathname.startsWith("/rollout/")
+    pathname.startsWith("/rollout/") ||
+    pathname.startsWith("/api/rollout")
   ) {
     return NextResponse.next();
   }
