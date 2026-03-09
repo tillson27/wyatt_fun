@@ -11,14 +11,23 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-interface SnapshotData {
+const COLORS = [
+  "#2563eb", "#16a34a", "#ea580c", "#9333ea",
+  "#0891b2", "#dc2626", "#65a30d", "#c026d3",
+  "#0284c7", "#b45309", "#7c3aed", "#059669",
+];
+
+interface ChartDataPoint {
   date: string;
-  Alpha: number;
-  Bravo: number;
-  Charlie: number;
+  [siteName: string]: string | number;
 }
 
-export function ProgressChart({ data }: { data: SnapshotData[] }) {
+interface ProgressChartProps {
+  data: ChartDataPoint[];
+  siteNames: string[];
+}
+
+export function ProgressChart({ data, siteNames }: ProgressChartProps) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
@@ -27,27 +36,16 @@ export function ProgressChart({ data }: { data: SnapshotData[] }) {
         <YAxis domain={[0, 100]} fontSize={12} />
         <Tooltip />
         <Legend />
-        <Line
-          type="monotone"
-          dataKey="Alpha"
-          stroke="#2563eb"
-          strokeWidth={2}
-          dot={false}
-        />
-        <Line
-          type="monotone"
-          dataKey="Bravo"
-          stroke="#16a34a"
-          strokeWidth={2}
-          dot={false}
-        />
-        <Line
-          type="monotone"
-          dataKey="Charlie"
-          stroke="#ea580c"
-          strokeWidth={2}
-          dot={false}
-        />
+        {siteNames.map((name, i) => (
+          <Line
+            key={name}
+            type="monotone"
+            dataKey={name}
+            stroke={COLORS[i % COLORS.length]}
+            strokeWidth={2}
+            dot={false}
+          />
+        ))}
       </LineChart>
     </ResponsiveContainer>
   );
