@@ -62,21 +62,21 @@ export default async function DashboardPage() {
       }),
     ]);
 
-  // Build chart data
+  // Build chart data dynamically from snapshot site names
+  const siteNamesWithSnapshots = Array.from(new Set(snapshots.map((s) => s.site.name)));
   const chartDataMap = new Map<string, Record<string, number>>();
+  const defaultEntry = Object.fromEntries(siteNamesWithSnapshots.map((n) => [n, 0]));
   for (const snap of snapshots) {
     const dateKey = format(snap.date, "MMM d");
     if (!chartDataMap.has(dateKey)) {
-      chartDataMap.set(dateKey, { Alpha: 0, Bravo: 0, Charlie: 0 });
+      chartDataMap.set(dateKey, { ...defaultEntry });
     }
     const entry = chartDataMap.get(dateKey)!;
     entry[snap.site.name] = snap.progressPct;
   }
   const chartData = Array.from(chartDataMap.entries()).map(([date, vals]) => ({
     date,
-    Alpha: vals.Alpha ?? 0,
-    Bravo: vals.Bravo ?? 0,
-    Charlie: vals.Charlie ?? 0,
+    ...vals,
   }));
 
   // Count tasks by status per site
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Site Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {taskStats.map(({ site, total, done, inProgress, blocked, overdue }) => (
           <Link key={site.id} href={`/sites/${site.id}`}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -178,7 +178,7 @@ export default async function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ProgressChart data={chartData} />
+            <ProgressChart data={chartData} siteNames={siteNamesWithSnapshots} />
           </CardContent>
         </Card>
 

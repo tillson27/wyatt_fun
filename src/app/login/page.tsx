@@ -24,7 +24,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        router.push("/dashboard");
+        router.push("/rollout");
       } else {
         setError("Incorrect password");
         setPassword("");

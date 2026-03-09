@@ -6,8 +6,9 @@ import { Sidebar } from "@/components/sidebar";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  const isRollout   = pathname?.startsWith("/rollout");
 
-  if (isLoginPage) {
+  if (isLoginPage || isRollout) {
     return <>{children}</>;
   }
 

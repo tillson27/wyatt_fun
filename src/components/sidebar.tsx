@@ -10,6 +10,7 @@ import {
   BarChart3,
   MapPin,
   Calendar,
+  Grid3X3,
 } from "lucide-react";
 
 const navItems = [
@@ -19,6 +20,7 @@ const navItems = [
   { href: "/summaries/daily", label: "Daily Summary", icon: Calendar },
   { href: "/summaries/weekly", label: "Weekly Summary", icon: BarChart3 },
   { href: "/sites", label: "Sites", icon: MapPin },
+  { href: "/rollout", label: "Rollout Dashboard", icon: Grid3X3 },
 ];
 
 export function Sidebar() {
@@ -53,7 +55,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="text-xs text-slate-400 pt-4 border-t">
-        3 Sites &middot; 2 Vendors &middot; 5 Streams
+        16 Sites &middot; 2 Vendors &middot; 6 Streams
       </div>
     </aside>
   );
