@@ -1066,6 +1066,19 @@ function GanttView({ items, onUpdate }) {
   const [selMod,  setSelMod]  = useState(null);
   const today = new Date();
 
+  // Activity filters
+  const [filterStatus,  setFilterStatus]  = useState("all");   // "all" | "complete" | "incomplete"
+  const [filterRags,    setFilterRags]    = useState(new Set()); // empty = show all
+  const [filterDelayed, setFilterDelayed] = useState(false);
+
+  const toggleRag = (r) => setFilterRags(prev => {
+    const next = new Set(prev);
+    if (next.has(r)) { next.delete(r); } else { next.add(r); }
+    return next;
+  });
+  const anyFilter = filterStatus !== "all" || filterRags.size > 0 || filterDelayed;
+  const clearFilters = () => { setFilterStatus("all"); setFilterRags(new Set()); setFilterDelayed(false); };
+
   const availMods    = MODULES.filter(m => inScope(selSite, m.id));
   const effectiveMod = availMods.find(m => m.id === selMod)?.id ?? availMods[0]?.id ?? null;
   const key          = effectiveMod ? `${selSite}::${effectiveMod}` : null;
@@ -1124,9 +1137,20 @@ function GanttView({ items, onUpdate }) {
 
   const BAR_COLOR = { Green: "bg-teal-500", Amber: "bg-amber-500", Red: "bg-red-500" };
 
+  // Apply filters to the activity list
+  const visibleActs = draftActs.filter(act => {
+    const overdue = act.dueDate && !act.completed && new Date(act.dueDate) < today;
+    if (filterDelayed && !overdue) return false;
+    if (filterStatus === "complete"   && !act.completed) return false;
+    if (filterStatus === "incomplete" &&  act.completed) return false;
+    if (filterRags.size > 0 && !filterRags.has(act.rag ?? "Green")) return false;
+    return true;
+  });
+  const hiddenCount = draftActs.length - visibleActs.length;
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
+      {/* Site / module selectors */}
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-semibold text-slate-800 mr-1">Activity Gantt</h2>
         <select value={selSite} onChange={e => setSelSite(e.target.value)}
@@ -1143,6 +1167,67 @@ function GanttView({ items, onUpdate }) {
         </select>
       </div>
 
+      {/* Activity filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-slate-500 font-medium mr-1">Filter:</span>
+
+        {/* Completion */}
+        {["all", "incomplete", "complete"].map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)}
+            className={`px-2.5 py-1 rounded-full border text-xs transition-all ${
+              filterStatus === s
+                ? "bg-slate-800 text-white border-slate-800"
+                : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+            }`}>
+            {s === "all" ? "All" : s === "incomplete" ? "Incomplete" : "Complete"}
+          </button>
+        ))}
+
+        <span className="w-px h-4 bg-slate-200 mx-1" />
+
+        {/* RAG toggles */}
+        {["Green", "Amber", "Red"].map(r => {
+          const active = filterRags.has(r);
+          return (
+            <button key={r} onClick={() => toggleRag(r)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                active
+                  ? `${RAG[r].light} ${RAG[r].border} ${RAG[r].text} font-medium`
+                  : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+              }`}>
+              <RagDot rag={r} size="w-1.5 h-1.5" />{r}
+            </button>
+          );
+        })}
+
+        <span className="w-px h-4 bg-slate-200 mx-1" />
+
+        {/* Delayed toggle */}
+        <button onClick={() => setFilterDelayed(v => !v)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
+            filterDelayed
+              ? "bg-red-50 text-red-700 border-red-300 font-medium"
+              : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+          }`}>
+          <Clock className="h-3 w-3" /> Delayed
+        </button>
+
+        {/* Clear filters */}
+        {anyFilter && (
+          <button onClick={clearFilters}
+            className="ml-1 text-xs text-slate-400 hover:text-slate-600 underline">
+            Clear
+          </button>
+        )}
+
+        {/* Count badge */}
+        {hiddenCount > 0 && (
+          <span className="ml-auto text-xs text-slate-400 italic">
+            {hiddenCount} activit{hiddenCount === 1 ? "y" : "ies"} hidden
+          </span>
+        )}
+      </div>
+
       {/* Module summary card */}
       {item && (
         <div className="bg-white rounded-lg border border-slate-200 p-4 flex flex-wrap items-center gap-4">
@@ -1153,7 +1238,7 @@ function GanttView({ items, onUpdate }) {
           </div>
           <div className="flex-1 min-w-40">
             <div className="flex justify-between text-xs text-slate-500 mb-1">
-              <span>{draftActs.filter(a => a.completed).length}/{draftActs.length} activities complete</span>
+              <span>{draftActs.filter(a => a.completed).length}/{draftActs.length} activities complete{anyFilter ? ` · showing ${visibleActs.length}` : ""}</span>
               <span className="font-medium">{activityPct({ ...item, activities: draftActs })}%</span>
             </div>
             <ProgressBar pct={activityPct({ ...item, activities: draftActs })} />
@@ -1189,9 +1274,15 @@ function GanttView({ items, onUpdate }) {
               <p className="text-sm mb-3">No activities for this module yet.</p>
             </div>
           )}
+          {draftActs.length > 0 && visibleActs.length === 0 && (
+            <div className="py-10 text-center text-slate-400 min-w-[720px]">
+              <p className="text-sm">No activities match the current filters.</p>
+              <button onClick={clearFilters} className="mt-2 text-xs text-teal-600 hover:underline">Clear filters</button>
+            </div>
+          )}
 
           {/* Activity rows */}
-          {draftActs.map(act => {
+          {visibleActs.map(act => {
             const sp = toG(act.startDate), ep = toG(act.dueDate);
             const hasBar = sp !== null && ep !== null && ep > sp;
             const trackW = hasBar ? ep - sp : 0;
