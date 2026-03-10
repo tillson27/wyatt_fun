@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart, CalendarRange,
+  LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart, CalendarRange, Flag,
   ChevronDown, ChevronRight, X, CheckCircle2, AlertTriangle,
   Clock, Target, Edit3, TrendingUp, Plus, Trash2, Activity, Menu,
 } from "lucide-react";
@@ -303,7 +303,7 @@ function EditModal({ itemKey, items, onSave, onClose }) {
   const addActivity = () =>
     setForm(prev => ({
       ...prev,
-      activities: [...prev.activities, { id: newActivityId(), title: "", pctComplete: 0, completed: false, startDate: "", dueDate: "", rag: "Green" }],
+      activities: [...prev.activities, { id: newActivityId(), title: "", pctComplete: 0, completed: false, startDate: "", dueDate: "", rag: "Green", milestone: false }],
     }));
 
   const setAct = (i, field, value) =>
@@ -494,6 +494,11 @@ function EditModal({ itemKey, items, onSave, onClose }) {
                         onChange={e => setAct(i, "title", e.target.value)}
                         placeholder="Activity name"
                         className={`flex-1 bg-transparent border-0 border-b text-xs py-0.5 focus:outline-none focus:border-teal-400 ${act.completed ? "line-through text-slate-400 border-slate-200" : "text-slate-700 border-slate-300"}`} />
+                      <button onClick={() => setAct(i, "milestone", !act.milestone)}
+                        title={act.milestone ? "Remove milestone flag" : "Mark as milestone"}
+                        className={`flex-shrink-0 transition-colors ${act.milestone ? "text-amber-500" : "text-slate-300 hover:text-amber-400"}`}>
+                        <Flag className="h-3.5 w-3.5" />
+                      </button>
                       <button onClick={() => removeActivity(i)} className="text-slate-300 hover:text-red-500 flex-shrink-0">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -970,11 +975,12 @@ function TimelineView({ items, onEdit }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-6 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1.5"><span className="w-4 h-2 bg-slate-300 rounded inline-block opacity-40" /> Track</span>
         <span className="flex items-center gap-1.5"><span className="w-4 h-2 bg-teal-500 rounded inline-block" /> Progress</span>
         <span className="flex items-center gap-1.5"><span className="w-px h-4 bg-blue-500 inline-block" /> Today</span>
         <span className="flex items-center gap-1.5"><span className="w-px h-4 bg-slate-500 inline-block" /> Target date</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rotate-45 bg-amber-500 inline-block" /> Milestone</span>
       </div>
 
       {BUSINESS_UNITS.map(bu => {
@@ -1024,6 +1030,20 @@ function TimelineView({ items, onEdit }) {
                         <div className="absolute h-3 top-1 rounded bg-slate-300 opacity-30" style={{ left: `${startPct}%`, width: `${trackW}%` }} />
                         <div className={`absolute h-3 top-1 rounded ${barColor}`} style={{ left: `${startPct}%`, width: `${fillW}%` }} />
                         <div className={`absolute top-0 h-5 w-px ${overdue ? "bg-red-600" : "bg-slate-500"}`} style={{ left: `${targetPct}%` }} />
+                        {/* Milestone diamonds */}
+                        {item.activities?.filter(a => a.milestone && a.dueDate).map(act => {
+                          const mPct = toPct(act.dueDate);
+                          const mRag = act.rag ?? "Green";
+                          const mColor = mRag === "Red" ? "bg-red-600" : mRag === "Amber" ? "bg-amber-500" : "bg-teal-600";
+                          const mOverdue = new Date(act.dueDate) < today && !act.completed;
+                          return (
+                            <div key={act.id} className="absolute top-0 h-5 z-20 flex items-center justify-center"
+                              style={{ left: `${mPct}%`, transform: "translateX(-50%)" }}
+                              title={act.title || "Milestone"}>
+                              <div className={`w-3 h-3 rotate-45 ${mOverdue ? "bg-red-600" : mColor} shadow-sm`} />
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -1075,7 +1095,7 @@ function GanttView({ items, onUpdate }) {
     setDraftActs(prev => prev.map(a => a.id !== actId ? a : { ...a, [field]: value }));
 
   const addAct = () =>
-    persist([...draftActs, { id: newActivityId(), title: "", pctComplete: 0, completed: false, startDate: "", dueDate: "", rag: "Green" }]);
+    persist([...draftActs, { id: newActivityId(), title: "", pctComplete: 0, completed: false, startDate: "", dueDate: "", rag: "Green", milestone: false }]);
 
   const removeAct = (actId) => persist(draftActs.filter(a => a.id !== actId));
 
@@ -1196,6 +1216,11 @@ function GanttView({ items, onUpdate }) {
                       onBlur={() => persist(draftActs)}
                       placeholder="Activity name"
                       className={`flex-1 text-xs bg-transparent border-0 border-b border-transparent focus:border-teal-400 focus:outline-none py-0.5 min-w-0 ${act.completed ? "line-through text-slate-400" : "text-slate-700"}`} />
+                    <button onClick={() => updateAct(act.id, "milestone", !act.milestone)}
+                      title={act.milestone ? "Remove milestone flag" : "Mark as milestone"}
+                      className={`flex-shrink-0 transition-colors ${act.milestone ? "text-amber-500" : "text-slate-300 hover:text-amber-400"}`}>
+                      <Flag className="h-3 w-3" />
+                    </button>
                     <button onClick={() => removeAct(act.id)}
                       className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 flex-shrink-0 transition-opacity">
                       <Trash2 className="h-3 w-3" />
@@ -1237,7 +1262,29 @@ function GanttView({ items, onUpdate }) {
                 {/* Right Gantt bar panel */}
                 <div className="flex-1 relative">
                   <div className="absolute inset-y-0 w-px bg-blue-400 opacity-40 z-10" style={{ left: `${todayPct}%` }} />
-                  {hasBar ? (
+                  {act.milestone ? (
+                    ep !== null ? (
+                      <>
+                        {/* Milestone vertical spine */}
+                        <div className={`absolute inset-y-0 w-0.5 ${barColor} opacity-60 z-10`} style={{ left: `${ep}%` }} />
+                        {/* Milestone diamond */}
+                        <div className="absolute z-20" style={{ left: `${ep}%`, top: "50%", transform: "translate(-50%, -50%)" }}>
+                          <div className={`w-4 h-4 rotate-45 ${barColor} shadow-sm`} />
+                        </div>
+                        {/* Activity name label */}
+                        {act.title && (
+                          <span className={`absolute text-xs whitespace-nowrap select-none ${overdue ? "text-red-500 font-medium" : "text-slate-500"}`}
+                            style={{ left: `calc(${ep}% + 14px)`, top: "50%", transform: "translateY(-50%)" }}>
+                            {act.title}{overdue && " ⚠"}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center h-full pl-4">
+                        <span className="text-xs text-slate-300 italic">Set end date for milestone marker</span>
+                      </div>
+                    )
+                  ) : hasBar ? (
                     <>
                       {/* Track */}
                       <div className="absolute top-1/2 -translate-y-1/2 h-5 rounded bg-slate-200 opacity-40"
