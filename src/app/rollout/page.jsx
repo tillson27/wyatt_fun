@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart,
+  LayoutDashboard, Grid3X3, Layers, MapPin, GanttChart, CalendarRange,
   ChevronDown, ChevronRight, X, CheckCircle2, AlertTriangle,
   Clock, Target, Edit3, TrendingUp, Plus, Trash2, Activity, Menu,
 } from "lucide-react";
@@ -303,7 +303,7 @@ function EditModal({ itemKey, items, onSave, onClose }) {
   const addActivity = () =>
     setForm(prev => ({
       ...prev,
-      activities: [...prev.activities, { id: newActivityId(), title: "", pctComplete: 0, completed: false, dueDate: "", rag: "Green" }],
+      activities: [...prev.activities, { id: newActivityId(), title: "", pctComplete: 0, completed: false, startDate: "", dueDate: "", rag: "Green" }],
     }));
 
   const setAct = (i, field, value) =>
@@ -1038,15 +1038,260 @@ function TimelineView({ items, onEdit }) {
 }
 
 // ============================================================
+// ACTIVITY GANTT VIEW
+// ============================================================
+
+function GanttView({ items, onUpdate }) {
+  const [selSite, setSelSite] = useState(BUSINESS_UNITS[0].sites[0]);
+  const [selMod,  setSelMod]  = useState(null);
+  const today = new Date();
+
+  const availMods    = MODULES.filter(m => inScope(selSite, m.id));
+  const effectiveMod = availMods.find(m => m.id === selMod)?.id ?? availMods[0]?.id ?? null;
+  const key          = effectiveMod ? `${selSite}::${effectiveMod}` : null;
+  const item         = key ? items[key] : null;
+
+  // Local draft so title-typing is smooth; syncs when the selected item changes
+  const [draftActs, setDraftActs] = useState([]);
+  useEffect(() => { setDraftActs(item?.activities ?? []); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const persist = (newActs) => {
+    setDraftActs(newActs);
+    if (key && item) onUpdate(key, { ...item, activities: newActs });
+  };
+
+  const updateAct = (actId, field, value) => {
+    const newActs = draftActs.map(a => {
+      if (a.id !== actId) return a;
+      const next = { ...a, [field]: value };
+      if (field === "completed" && value) next.pctComplete = 100;
+      if (field === "pctComplete") next.completed = value === 100;
+      return next;
+    });
+    persist(newActs);
+  };
+
+  const updateDraft = (actId, field, value) =>
+    setDraftActs(prev => prev.map(a => a.id !== actId ? a : { ...a, [field]: value }));
+
+  const addAct = () =>
+    persist([...draftActs, { id: newActivityId(), title: "", pctComplete: 0, completed: false, startDate: "", dueDate: "", rag: "Green" }]);
+
+  const removeAct = (actId) => persist(draftActs.filter(a => a.id !== actId));
+
+  // Compute Gantt date range from activities
+  const allDates = draftActs.flatMap(a => [a.startDate, a.dueDate].filter(d => d && /^\d{4}-\d{2}-\d{2}/.test(d)));
+  let ganttStart, ganttEnd;
+  if (allDates.length >= 2) {
+    const ts = allDates.map(d => new Date(d).getTime());
+    ganttStart = new Date(Math.min(...ts) - 14 * 86400000);
+    ganttEnd   = new Date(Math.max(...ts) + 21 * 86400000);
+  } else {
+    ganttStart = new Date(today.getTime() - 30 * 86400000);
+    ganttEnd   = new Date(today.getTime() + 90 * 86400000);
+  }
+  const ganttMs  = ganttEnd - ganttStart;
+  const toG      = (d) => d ? Math.max(0, Math.min(100, ((new Date(d) - ganttStart) / ganttMs) * 100)) : null;
+  const todayPct = toG(today);
+
+  // Month header labels
+  const monthLabels = [];
+  const mc = new Date(ganttStart); mc.setDate(1);
+  while (mc <= ganttEnd) {
+    monthLabels.push({ label: mc.toLocaleString("default", { month: "short", year: "2-digit" }), pct: toG(mc) });
+    mc.setMonth(mc.getMonth() + 1);
+  }
+
+  const BAR_COLOR = { Green: "bg-teal-500", Amber: "bg-amber-500", Red: "bg-red-500" };
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-semibold text-slate-800 mr-1">Activity Gantt</h2>
+        <select value={selSite} onChange={e => setSelSite(e.target.value)}
+          className="border border-slate-200 rounded-md px-3 py-1.5 text-sm bg-white text-slate-700">
+          {BUSINESS_UNITS.map(b => (
+            <optgroup key={b.id} label={b.name}>
+              {b.sites.map(s => <option key={s} value={s}>{s}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <select value={effectiveMod ?? ""} onChange={e => setSelMod(e.target.value)}
+          className="border border-slate-200 rounded-md px-3 py-1.5 text-sm bg-white text-slate-700">
+          {availMods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      </div>
+
+      {/* Module summary card */}
+      {item && (
+        <div className="bg-white rounded-lg border border-slate-200 p-4 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <RagDot rag={activityRag(item)} size="w-2.5 h-2.5" />
+            <StatusChip status={item.status} />
+            {item.owner && <span className="text-xs text-slate-500">{item.owner}</span>}
+          </div>
+          <div className="flex-1 min-w-40">
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
+              <span>{draftActs.filter(a => a.completed).length}/{draftActs.length} activities complete</span>
+              <span className="font-medium">{activityPct({ ...item, activities: draftActs })}%</span>
+            </div>
+            <ProgressBar pct={activityPct({ ...item, activities: draftActs })} />
+          </div>
+          {item.targetGoLive && (
+            <span className="text-xs text-slate-400 flex-shrink-0">Target: {item.targetGoLive}</span>
+          )}
+        </div>
+      )}
+
+      {/* Gantt table */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          {/* Header */}
+          <div className="flex border-b border-slate-200 bg-slate-50 min-w-[720px]">
+            <div className="w-80 flex-shrink-0 px-4 py-2.5 border-r border-slate-200">
+              <span className="text-xs font-medium text-slate-600">Activity</span>
+            </div>
+            <div className="flex-1 relative" style={{ height: 36 }}>
+              {monthLabels.map(({ label, pct }) => (
+                <div key={label} className="absolute top-0 h-full flex items-center" style={{ left: `${pct}%` }}>
+                  <div className="w-px h-full bg-slate-200" />
+                  <span className="text-xs text-slate-400 pl-1.5 whitespace-nowrap select-none">{label}</span>
+                </div>
+              ))}
+              <div className="absolute top-0 h-full w-px bg-blue-400 z-10 opacity-70" style={{ left: `${todayPct}%` }} />
+            </div>
+          </div>
+
+          {/* Empty state */}
+          {draftActs.length === 0 && (
+            <div className="py-12 text-center text-slate-400 min-w-[720px]">
+              <p className="text-sm mb-3">No activities for this module yet.</p>
+            </div>
+          )}
+
+          {/* Activity rows */}
+          {draftActs.map(act => {
+            const sp = toG(act.startDate), ep = toG(act.dueDate);
+            const hasBar = sp !== null && ep !== null && ep > sp;
+            const trackW = hasBar ? ep - sp : 0;
+            const fillW  = hasBar ? trackW * (act.completed ? 100 : act.pctComplete) / 100 : 0;
+            const overdue   = act.dueDate && !act.completed && new Date(act.dueDate) < today;
+            const barColor  = BAR_COLOR[overdue ? "Red" : (act.rag ?? "Green")];
+
+            return (
+              <div key={act.id}
+                className={`flex border-b border-slate-100 group min-w-[720px] ${act.completed ? "bg-green-50/20" : overdue ? "bg-red-50/10" : ""}`}>
+
+                {/* Left detail panel */}
+                <div className="w-80 flex-shrink-0 px-3 py-2.5 border-r border-slate-100 space-y-2">
+
+                  {/* Title row */}
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={act.completed}
+                      onChange={e => updateAct(act.id, "completed", e.target.checked)}
+                      className="accent-teal-600 w-3.5 h-3.5 flex-shrink-0" />
+                    <input type="text" value={act.title}
+                      onChange={e => updateDraft(act.id, "title", e.target.value)}
+                      onBlur={() => persist(draftActs)}
+                      placeholder="Activity name"
+                      className={`flex-1 text-xs bg-transparent border-0 border-b border-transparent focus:border-teal-400 focus:outline-none py-0.5 min-w-0 ${act.completed ? "line-through text-slate-400" : "text-slate-700"}`} />
+                    <button onClick={() => removeAct(act.id)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 flex-shrink-0 transition-opacity">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* RAG + % row */}
+                  <div className="flex items-center gap-3 pl-5">
+                    <div className="flex gap-0.5">
+                      {["Green", "Amber", "Red"].map(r => (
+                        <button key={r} onClick={() => updateAct(act.id, "rag", r)}
+                          className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${(act.rag ?? "Green") === r ? `${RAG[r].dot} border-transparent scale-110` : "bg-transparent border-slate-300 hover:border-slate-400"}`}
+                          title={r} />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <input type="number" min="0" max="100"
+                        value={act.completed ? 100 : act.pctComplete}
+                        disabled={act.completed}
+                        onChange={e => updateAct(act.id, "pctComplete", Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-12 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-right disabled:bg-slate-50 disabled:text-slate-300" />
+                      <span className="text-xs text-slate-400">%</span>
+                    </div>
+                  </div>
+
+                  {/* Date row */}
+                  <div className="flex items-center gap-1.5 pl-5">
+                    <input type="date" value={act.startDate ?? ""}
+                      onChange={e => updateAct(act.id, "startDate", e.target.value)}
+                      className="border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-600 flex-1 min-w-0" />
+                    <span className="text-xs text-slate-400">→</span>
+                    <input type="date" value={act.dueDate ?? ""}
+                      onChange={e => updateAct(act.id, "dueDate", e.target.value)}
+                      className={`border rounded px-1.5 py-0.5 text-xs flex-1 min-w-0 ${overdue ? "border-red-300 text-red-600" : "border-slate-200 text-slate-600"}`} />
+                    {overdue && <span className="text-xs text-red-500 flex-shrink-0">⚠</span>}
+                  </div>
+                </div>
+
+                {/* Right Gantt bar panel */}
+                <div className="flex-1 relative">
+                  <div className="absolute inset-y-0 w-px bg-blue-400 opacity-40 z-10" style={{ left: `${todayPct}%` }} />
+                  {hasBar ? (
+                    <>
+                      {/* Track */}
+                      <div className="absolute top-1/2 -translate-y-1/2 h-5 rounded bg-slate-200 opacity-40"
+                        style={{ left: `${sp}%`, width: `${trackW}%` }} />
+                      {/* Fill */}
+                      {fillW > 0 && (
+                        <div className={`absolute top-1/2 -translate-y-1/2 h-5 rounded ${barColor} opacity-85`}
+                          style={{ left: `${sp}%`, width: `${fillW}%` }} />
+                      )}
+                      {/* % label inside bar */}
+                      {fillW > 8 && (
+                        <span className="absolute top-1/2 -translate-y-1/2 text-white text-xs font-medium leading-none select-none"
+                          style={{ left: `calc(${sp}% + 6px)` }}>
+                          {act.completed ? 100 : act.pctComplete}%
+                        </span>
+                      )}
+                      {/* End marker */}
+                      <div className={`absolute inset-y-0 w-0.5 ${overdue ? "bg-red-500" : "bg-slate-400"} opacity-60`}
+                        style={{ left: `${ep}%` }} />
+                    </>
+                  ) : (
+                    <div className="flex items-center h-full pl-4">
+                      <span className="text-xs text-slate-300 italic">Set start &amp; end dates to see bar</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add activity footer */}
+        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/50">
+          <button onClick={addAct}
+            className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-700 font-medium">
+            <Plus className="h-3.5 w-3.5" /> Add activity
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN
 // ============================================================
 
 const NAV = [
-  { id: "summary",  label: "Summary",     icon: LayoutDashboard },
-  { id: "matrix",   label: "Matrix View", icon: Grid3X3 },
-  { id: "module",   label: "Module View", icon: Layers },
-  { id: "site",     label: "Site View",   icon: MapPin },
-  { id: "timeline", label: "Timeline",    icon: GanttChart },
+  { id: "summary",  label: "Summary",        icon: LayoutDashboard },
+  { id: "matrix",   label: "Matrix View",    icon: Grid3X3 },
+  { id: "module",   label: "Module View",    icon: Layers },
+  { id: "site",     label: "Site View",      icon: MapPin },
+  { id: "timeline", label: "Timeline",       icon: GanttChart },
+  { id: "gantt",    label: "Activity Gantt", icon: CalendarRange },
 ];
 
 export default function RolloutDashboard() {
@@ -1159,6 +1404,7 @@ export default function RolloutDashboard() {
           {view === "module"   && <ModuleView   items={items} onUpdate={updateItem} onEdit={setEditing} />}
           {view === "site"     && <SiteView     items={items} onUpdate={updateItem} onEdit={setEditing} />}
           {view === "timeline" && <TimelineView items={items} onEdit={setEditing} />}
+          {view === "gantt"    && <GanttView    items={items} onUpdate={updateItem} />}
         </main>
       </div>
 
