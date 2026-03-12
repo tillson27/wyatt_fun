@@ -1485,8 +1485,8 @@ export default function RolloutDashboard() {
   const NavContent = () => (
     <>
       <div className="px-5 py-5 border-b border-slate-700/60">
-        <p className="text-xs font-bold text-white tracking-wide">STRATHCONA RESOURCES</p>
-        <p className="text-xs text-slate-400 mt-0.5">Digitization Rollout Tracker</p>
+        <p className="text-xs font-bold text-white tracking-wide">SR</p>
+        <p className="text-xs text-slate-400 mt-0.5">Field Standardization Tracker</p>
       </div>
       <nav className="flex-1 p-3 space-y-0.5">
         {NAV.map(({ id, label, icon: Icon }) => (
