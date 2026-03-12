@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "SAGD Operations Tracker",
+  title: "Field Standardization Tracker",
   description: "Project tracking dashboard for SAGD implementation",
 };
 
