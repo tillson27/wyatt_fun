@@ -2,18 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const PASSWORD_COOKIE = "sagd_auth";
-const HASHED_PASSWORD = "a]3#fK9$mQ"; // obfuscated token stored in cookie when authenticated
+const AUTH_TOKEN = process.env.AUTH_TOKEN ?? "";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow login page, login API, rollout dashboard and its API routes
+  // Allow login page and login API only
   if (
     pathname === "/login" ||
-    pathname === "/api/auth/login" ||
-    pathname === "/rollout" ||
-    pathname.startsWith("/rollout/") ||
-    pathname.startsWith("/api/rollout")
+    pathname === "/api/auth/login"
   ) {
     return NextResponse.next();
   }
@@ -32,7 +29,7 @@ export function middleware(request: NextRequest) {
 
   const authCookie = request.cookies.get(PASSWORD_COOKIE);
 
-  if (!authCookie || authCookie.value !== HASHED_PASSWORD) {
+  if (!authCookie || authCookie.value !== AUTH_TOKEN) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }

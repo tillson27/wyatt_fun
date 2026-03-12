@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 
-const CORRECT_PASSWORD = "ILOVECOCK";
 const PASSWORD_COOKIE = "sagd_auth";
-const COOKIE_TOKEN = "a]3#fK9$mQ";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export async function POST(request: Request) {
   const body = await request.json();
   const { password } = body;
 
-  if (password === CORRECT_PASSWORD) {
+  const correctPassword = process.env.AUTH_PASSWORD ?? "";
+  const cookieToken = process.env.AUTH_TOKEN ?? "";
+
+  if (password === correctPassword) {
     const response = NextResponse.json({ success: true });
-    response.cookies.set(PASSWORD_COOKIE, COOKIE_TOKEN, {
+    response.cookies.set(PASSWORD_COOKIE, cookieToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
